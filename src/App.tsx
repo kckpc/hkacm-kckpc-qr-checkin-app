@@ -134,8 +134,15 @@ function App() {
   // Add this state variable for storing all participants
   const [participants, setParticipants] = useState<ParticipantsList>({});
 
-  // Dynamically construct the API URL based on the current hostname
-  const API_URL = API_BASE_URL;
+  const [customServerAddress, setCustomServerAddress] = useState('');
+  const [showCustomServerInput, setShowCustomServerInput] = useState(false);
+
+  const API_BASE_URL = customServerAddress || process.env.REACT_APP_API_URL || `https://${window.location.hostname}:3001/api`;
+
+  const axiosInstance = axios.create({
+    baseURL: API_BASE_URL,
+    // ... other configurations
+  });
 
   const [scanning, setScanning] = useState(false);
   const [autoScan, setAutoScan] = useState(false);
@@ -191,7 +198,34 @@ function App() {
 
   const [audioContextInitialized, setAudioContextInitialized] = useState(false);
 
+  const [serverLink, setServerLink] = useState(API_BASE_URL);
+  const [tempServerLink, setTempServerLink] = useState(API_BASE_URL);
+
   const { playSound, isLoaded: isSoundLoaded } = useAudio();
+
+  const handleCustomServerSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCustomServerAddress(customServerAddress.trim());
+    setShowCustomServerInput(false);
+    // Reinitialize the app with the new server address
+    fetchInitialData();
+  };
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      await fetchTotalPeople();
+      await fetchDailyCheckInCount();
+      await fetchCurrentActivity();
+      await fetchScanEntries();
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      setShowCustomServerInput(true);
+    }
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const getCameras = useCallback(async () => {
     try {
@@ -237,7 +271,7 @@ function App() {
 
   const fetchParticipants = async () => {
     try {
-      const response = await axiosInstance.get(`${API_URL}/participants`);
+      const response = await axiosInstance.get(`${API_BASE_URL}/participants`);
       const participantsData: ParticipantsList = {};
       response.data.forEach((p: Participant) => {
         participantsData[p.id] = p;
@@ -266,7 +300,7 @@ function App() {
 
   const fetchParticipantsOnLogin = async () => {
     try {
-      const response = await axiosInstance.get(`${API_URL}/participants`);
+      const response = await axiosInstance.get(`${API_BASE_URL}/participants`);
       const participantsData: ParticipantsList = {};
       response.data.forEach((p: Participant) => {
         participantsData[p.id] = p;
@@ -319,7 +353,7 @@ function App() {
     try {
       const checkInTime = new Date().toISOString();
       console.log('Sending check-in request to server...');
-      const response = await axiosInstance.post(`${API_URL}/check-in`, {
+      const response = await axiosInstance.post(`${API_BASE_URL}/check-in`, {
         qrData: id,
         checkInTime: checkInTime,
         isDemoMode: isDemoMode,
@@ -384,7 +418,7 @@ function App() {
         setTimeout(() => setScanning(true), 2000);
       }
     }
-  }, [autoScan, currentActivityName, isDemoMode, playSound, isSoundLoaded, API_URL]);
+  }, [autoScan, currentActivityName, isDemoMode, playSound, isSoundLoaded, API_BASE_URL]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -403,7 +437,7 @@ function App() {
     formData.append('activityName', pendingActivityName);
 
     try {
-      const response = await axiosInstance.post(`${API_URL}/upload-participants`, formData, {
+      const response = await axiosInstance.post(`${API_BASE_URL}/upload-participants`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setUploadStatus('參與者資料更新成功');
@@ -412,7 +446,7 @@ function App() {
       setCurrentActivityName(pendingActivityName);
       
       // Add this line to update the activity name on the server
-      await axiosInstance.post(`${API_URL}/set-current-activity`, { activityName: pendingActivityName });
+      await axiosInstance.post(`${API_BASE_URL}/set-current-activity`, { activityName: pendingActivityName });
       
       setError(null);
       setShowUpdateConfirmation(false);
@@ -429,7 +463,7 @@ function App() {
 
   const handleClearData = async () => {
     try {
-      const response = await axiosInstance.post(`${API_URL}/clear-participants`);
+      const response = await axiosInstance.post(`${API_BASE_URL}/clear-participants`);
       setUploadStatus('所有參與者資料已成功清除');
       setParticipant(null);
       setError(null);
@@ -470,7 +504,7 @@ function App() {
 
   const handleExportExcel = async () => {
     try {
-      const response = await axiosInstance.get(`${API_URL}/export-checkins`, {
+      const response = await axiosInstance.get(`${API_BASE_URL}/export-checkins`, {
         responseType: 'blob',
       });
       const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -502,7 +536,7 @@ function App() {
     if (modeSwitchPassword === 'hkacmadmin') {
       try {
         const newMode = !isDemoMode;
-        const response = await axiosInstance.post(`${API_URL}/set-demo-mode`, { isDemoMode: newMode });
+        const response = await axiosInstance.post(`${API_BASE_URL}/set-demo-mode`, { isDemoMode: newMode });
         if (response.data.success) {
           setIsDemoMode(newMode);
           setShowModeSwitch(false);
@@ -595,7 +629,7 @@ function App() {
 
   const handleResetDailyCheckInCount = async () => {
     try {
-      const response = await axiosInstance.post(`${API_URL}/reset-daily-check-in-count`);
+      const response = await axiosInstance.post(`${API_BASE_URL}/reset-daily-check-in-count`);
       if (response.data.success) {
         setDailyCheckInCount(response.data.dailyCheckInCount);
         setLastCheckInStatus('今日總簽到次數已重置');
@@ -670,7 +704,7 @@ function App() {
   // Add this function to handle activity name confirmation
   const handleConfirmActivityName = async () => {
     try {
-      const response = await axiosInstance.post(`${API_URL}/set-current-activity`, { activityName: pendingActivityName });
+      const response = await axiosInstance.post(`${API_BASE_URL}/set-current-activity`, { activityName: pendingActivityName });
       if (response.data.success) {
         setCurrentActivityName(pendingActivityName);
         setError(null);
@@ -728,7 +762,7 @@ function App() {
   const handleClearCheckInRecords = async () => {
     setIsClearingCheckIns(true);
     try {
-      const response = await axiosInstance.post(`${API_URL}/clear-check-in-records`);
+      const response = await axiosInstance.post(`${API_BASE_URL}/clear-check-in-records`);
       if (response.data.success) {
         setUploadStatus('所有簽到記錄已成功清除');
         await fetchParticipants(); // Refresh the participant list
@@ -782,6 +816,17 @@ function App() {
       return Promise.reject(error);
     }
   );
+
+  const handleServerLinkChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setTempServerLink(event.target.value);
+  };
+
+  const handleServerLinkUpdate = () => {
+    setServerLink(tempServerLink);
+    // Update the axiosInstance baseURL
+    axiosInstance.defaults.baseURL = tempServerLink;
+    setUploadStatus('Server link updated successfully');
+  };
 
   return (
     <div className="App">
@@ -1097,7 +1142,7 @@ function App() {
                       type="password"
                       value={password}
                       onChange={handlePasswordChange}
-                      placeholder="輸入管理員密碼"
+                      placeholder="輸管理員密碼"
                       className="input-field"
                     />
                     <button type="submit" className="submit-button">登入</button>
@@ -1109,6 +1154,23 @@ function App() {
                       <button onClick={handleLock} className="lock-button">登出</button>
                     </div>
                     <div className="admin-controls">
+                      <div className="server-link-section">
+                        <h4>更新伺服器連結</h4>
+                        <div className="input-group">
+                          <input
+                            type="text"
+                            value={tempServerLink}
+                            onChange={handleServerLinkChange}
+                            placeholder="輸入新的伺服器連結"
+                            className="input-field"
+                          />
+                          <button onClick={handleServerLinkUpdate} className="confirm-button">
+                            更新連結
+                          </button>
+                        </div>
+                        <p>當前伺服器連結: {serverLink}</p>
+                      </div>
+
                       <div className="input-group">
                         <input
                           type="text"
@@ -1141,7 +1203,7 @@ function App() {
                     {showClearCheckInConfirmation && (
                       <div className="modal clear-confirmation">
                         <div className="modal-content">
-                          <h3>確認清除簽到記錄</h3>
+                          <h3>確認清除簽到記</h3>
                           <p>您確定要清除所有參與者的簽到記錄嗎？此操作無法撤銷。</p>
                           <div className="button-group">
                             <button 
@@ -1234,6 +1296,19 @@ function App() {
           </div>
         </div>
       </main>
+      {showCustomServerInput && (
+        <div className="custom-server-input">
+          <form onSubmit={handleCustomServerSubmit}>
+            <input
+              type="text"
+              value={customServerAddress}
+              onChange={(e) => setCustomServerAddress(e.target.value)}
+              placeholder="Enter custom server address"
+            />
+            <button type="submit">Connect to Custom Server</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

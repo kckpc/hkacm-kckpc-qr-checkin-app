@@ -1078,3 +1078,31 @@ button:disabled {
 .confirm-button {
   margin-top: 10px;
 }
+
+.server-link-section {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.server-link-section h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #3f51b5;
+}
+
+.server-link-section .input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.server-link-section .input-field {
+  flex-grow: 1;
+}
+
+.server-link-section p {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #666;
+}

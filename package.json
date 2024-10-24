@@ -43,6 +43,7 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "concurrently": "^8.2.1",
     "cross-env": "^7.0.3",
+    "customize-cra": "^1.0.0",
     "react-app-rewired": "^2.2.1",
     "serve": "^14.2.1",
     "wait-on": "^7.0.1"
